@@ -98,6 +98,10 @@ async function provarGemini(key, foto, arquivo, proporcao) {
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
     console.error("gemini:", r.status, JSON.stringify(data).slice(0, 500));
+    if (r.status === 429 && /free tier|limit: 0/i.test(JSON.stringify(data))) {
+      // projeto do Google sem faturamento ativo: geração de imagem não liberada
+      return { status: 503, body: { erro: "O provador virtual está sendo configurado. Volte em breve!" } };
+    }
     if (r.status === 429) return { status: 429, body: { erro: MENSAGENS.ConcurrencyLimitExceeded } };
     if (r.status === 400 && /safety|blocked|policy/i.test(JSON.stringify(data))) {
       return { status: 400, body: { erro: MENSAGENS.ContentModerationError } };
