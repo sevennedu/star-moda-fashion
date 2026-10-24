@@ -110,6 +110,134 @@ document.querySelectorAll(".marquee").forEach((m) => {
   m.addEventListener("touchend", () => setTimeout(() => m.classList.remove("is-paused"), 1500));
 });
 
+// ===== Provador virtual =====
+const provador = document.getElementById("provador-form");
+if (provador) {
+  const inputFoto = document.getElementById("foto");
+  const drop = document.getElementById("drop");
+  const preview = document.getElementById("foto-preview");
+  const consent = document.getElementById("consentimento");
+  const botao = document.getElementById("provar");
+  const box = document.getElementById("resultado");
+  const elEmpty = box.querySelector(".result__empty");
+  const elLoading = box.querySelector(".result__loading");
+  const elMsg = box.querySelector(".result__msg");
+  const elImg = box.querySelector(".result__img");
+  const elErro = box.querySelector(".result__error");
+  const acoes = provador.querySelector(".result__actions");
+  const quero = document.getElementById("quero");
+  const baixar = document.getElementById("baixar");
+  let fotoData = null;
+  let ativo = true;
+
+  const mostrar = (estado, texto) => {
+    elEmpty.hidden = estado !== "vazio";
+    elLoading.hidden = estado !== "carregando";
+    elImg.hidden = estado !== "pronto";
+    elErro.hidden = estado !== "erro";
+    box.classList.toggle("is-loading", estado === "carregando");
+    if (estado === "erro") elErro.textContent = texto;
+    if (estado === "carregando" && texto) elMsg.textContent = texto;
+    acoes.hidden = estado !== "pronto";
+  };
+
+  // Verifica se o provador está configurado no servidor
+  fetch("/api/provador?saude=1")
+    .then((r) => r.json())
+    .then((d) => { ativo = !!d.ativo; })
+    .catch(() => { ativo = false; })
+    .finally(() => {
+      if (!ativo) {
+        botao.disabled = true;
+        mostrar("erro", "O provador virtual está sendo configurado. Volte em breve!");
+      }
+    });
+
+  // Reduz a foto (máx. 1296 px) para enviar rápido
+  const prepararFoto = (file) =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const max = 1296;
+        const escala = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * escala);
+        c.height = Math.round(img.height * escala);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL("image/jpeg", 0.9));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("imagem")); };
+      img.src = url;
+    });
+
+  const receberArquivo = async (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    try {
+      fotoData = await prepararFoto(file);
+      preview.src = fotoData;
+      preview.hidden = false;
+      drop.querySelector(".drop__empty").hidden = true;
+      drop.querySelector(".drop__change").hidden = false;
+      if (ativo) mostrar("vazio");
+    } catch {
+      mostrar("erro", "Não conseguimos abrir essa imagem. Tente uma foto em JPG ou PNG.");
+    }
+  };
+
+  inputFoto.addEventListener("change", () => receberArquivo(inputFoto.files[0]));
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("is-over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("is-over"); }));
+  drop.addEventListener("drop", (e) => receberArquivo(e.dataTransfer.files[0]));
+
+  const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+  const frases = ["Analisando a sua foto…", "Vestindo o modelo escolhido…", "Ajustando caimento e luz…", "Quase pronto…"];
+
+  provador.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!ativo) return;
+    const escolhido = provador.querySelector('input[name="vestido"]:checked');
+    if (!fotoData) return mostrar("erro", "Envie uma foto sua de corpo inteiro (passo 1).");
+    if (!escolhido) return mostrar("erro", "Escolha um vestido (passo 2).");
+    if (!consent.checked) return mostrar("erro", "Marque a autorização de uso da foto para continuar.");
+
+    botao.disabled = true;
+    mostrar("carregando", frases[0]);
+    try {
+      const r = await fetch("/api/provador", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ foto: fotoData, vestido: escolhido.value }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.id) throw new Error(d.erro || "Não foi possível começar a prova.");
+
+      const inicio = Date.now();
+      let i = 0;
+      while (Date.now() - inicio < 120000) {
+        await esperar(2500);
+        elMsg.textContent = frases[Math.min(++i, frases.length - 1)];
+        const s = await fetch(`/api/provador?id=${encodeURIComponent(d.id)}`).then((x) => x.json());
+        if (s.status === "pronto") {
+          elImg.src = s.imagem;
+          baixar.href = s.imagem;
+          const msg = `Olá! Usei o provador virtual do site e quero o vestido ${escolhido.dataset.nome}.`;
+          quero.href = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
+          mostrar("pronto");
+          return;
+        }
+        if (s.status === "erro") throw new Error(s.erro);
+      }
+      throw new Error("Demorou mais que o esperado. Tente novamente.");
+    } catch (err) {
+      mostrar("erro", err.message || "Não foi possível gerar a imagem agora. Tente novamente.");
+    } finally {
+      botao.disabled = !ativo;
+    }
+  });
+}
+
 // ===== Fachada animada =====
 const scene = document.getElementById("scene");
 if (scene) {
