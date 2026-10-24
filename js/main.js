@@ -128,6 +128,7 @@ if (provador) {
   const quero = document.getElementById("quero");
   const baixar = document.getElementById("baixar");
   let fotoData = null;
+  let fotoProporcao = "3:4";
   let ativo = true;
 
   const mostrar = (estado, texto) => {
@@ -166,6 +167,10 @@ if (provador) {
         c.height = Math.round(img.height * escala);
         c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
+        // proporção mais próxima entre as aceitas pela IA
+        const opcoes = { "9:16": 9 / 16, "2:3": 2 / 3, "3:4": 3 / 4, "4:5": 4 / 5, "1:1": 1, "5:4": 5 / 4, "4:3": 4 / 3, "3:2": 3 / 2, "16:9": 16 / 9 };
+        const r = img.width / img.height;
+        fotoProporcao = Object.keys(opcoes).reduce((a, b) => (Math.abs(opcoes[b] - r) < Math.abs(opcoes[a] - r) ? b : a));
         resolve(c.toDataURL("image/jpeg", 0.9));
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("imagem")); };
@@ -204,35 +209,37 @@ if (provador) {
 
     botao.disabled = true;
     mostrar("carregando", frases[0]);
+    let f = 0;
+    const girar = setInterval(() => { elMsg.textContent = frases[Math.min(++f, frases.length - 1)]; }, 4000);
     try {
       const r = await fetch("/api/provador", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ foto: fotoData, vestido: escolhido.value }),
+        body: JSON.stringify({ foto: fotoData, vestido: escolhido.value, proporcao: fotoProporcao }),
       });
       const d = await r.json();
+      const pronto = (imagem) => {
+        elImg.src = imagem;
+        baixar.href = imagem;
+        const msg = `Olá! Usei o provador virtual do site e quero o vestido ${escolhido.dataset.nome}.`;
+        quero.href = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
+        mostrar("pronto");
+      };
+      if (r.ok && d.imagem) return pronto(d.imagem); // Gemini responde na hora
       if (!r.ok || !d.id) throw new Error(d.erro || "Não foi possível começar a prova.");
 
       const inicio = Date.now();
-      let i = 0;
       while (Date.now() - inicio < 120000) {
         await esperar(2500);
-        elMsg.textContent = frases[Math.min(++i, frases.length - 1)];
         const s = await fetch(`/api/provador?id=${encodeURIComponent(d.id)}`).then((x) => x.json());
-        if (s.status === "pronto") {
-          elImg.src = s.imagem;
-          baixar.href = s.imagem;
-          const msg = `Olá! Usei o provador virtual do site e quero o vestido ${escolhido.dataset.nome}.`;
-          quero.href = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
-          mostrar("pronto");
-          return;
-        }
+        if (s.status === "pronto") return pronto(s.imagem);
         if (s.status === "erro") throw new Error(s.erro);
       }
       throw new Error("Demorou mais que o esperado. Tente novamente.");
     } catch (err) {
       mostrar("erro", err.message || "Não foi possível gerar a imagem agora. Tente novamente.");
     } finally {
+      clearInterval(girar);
       botao.disabled = !ativo;
     }
   });
