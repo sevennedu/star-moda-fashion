@@ -38,14 +38,33 @@ if (statusEl) {
 const ano = document.getElementById("ano");
 if (ano) ano.textContent = new Date().getFullYear();
 
-// Cabeçalho: sombra ao rolar
+// Cabeçalho: sombra ao rolar + barra de progresso de leitura
 const header = document.querySelector(".header");
+const progressBar = document.getElementById("progress-bar");
+const heroPhoto = document.querySelector(".hero__photo");
+let tickAgendado = false;
 const onScroll = () => {
-  const y = window.scrollY;
-  header.classList.toggle("is-scrolled", y > 20);
+  if (tickAgendado) return;
+  tickAgendado = true;
+  requestAnimationFrame(() => {
+    tickAgendado = false;
+    const y = window.scrollY;
+    header.classList.toggle("is-scrolled", y > 20);
+    if (progressBar) {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      progressBar.style.setProperty("--progress", max > 0 ? Math.min(1, y / max) : 0);
+    }
+    if (heroPhoto && !reduceMotion && y < window.innerHeight) {
+      heroPhoto.style.setProperty("--parallax", `${y * 0.06}px`);
+    }
+  });
 };
 window.addEventListener("scroll", onScroll, { passive: true });
 onScroll();
+
+// Topo: textos e foto entram em sequência ao carregar a página
+const hero = document.querySelector(".hero");
+if (hero) requestAnimationFrame(() => requestAnimationFrame(() => hero.classList.add("is-ready")));
 
 // Menu do celular
 const toggle = document.querySelector(".nav-toggle");
@@ -83,8 +102,14 @@ const revealer = new IntersectionObserver(
   },
   { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
 );
-document.querySelectorAll(".reveal").forEach((el, i) => {
-  el.style.transitionDelay = `${(i % 5) * 70}ms`;
+// Atraso em cascata: conta a posição de cada item entre os irmãos com .reveal
+// do mesmo grupo (grade de cards, lista etc.), não a posição na página inteira.
+const indicePorGrupo = new WeakMap();
+document.querySelectorAll(".reveal").forEach((el) => {
+  const grupo = el.parentElement;
+  const indice = indicePorGrupo.get(grupo) || 0;
+  indicePorGrupo.set(grupo, indice + 1);
+  el.style.transitionDelay = `${Math.min(indice, 5) * 80}ms`;
   revealer.observe(el);
 });
 
@@ -185,6 +210,7 @@ if (provador) {
       preview.hidden = false;
       drop.querySelector(".drop__empty").hidden = true;
       drop.querySelector(".drop__change").hidden = false;
+      drop.classList.add("has-foto");
       if (ativo) mostrar("vazio");
     } catch {
       mostrar("erro", "Não conseguimos abrir essa imagem. Tente uma foto em JPG ou PNG.");
