@@ -1,0 +1,12 @@
+# Referências e anotações internas (ficam só no computador)
+Refs/
+identidade-star-moda.md
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+
+# Vercel
+.vercel/
