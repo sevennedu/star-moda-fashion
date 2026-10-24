@@ -45,6 +45,28 @@ const MENSAGENS = {
 };
 const MAX_FOTO_BYTES = 3.5 * 1024 * 1024; // limite de envio da Vercel é 4,5 MB
 
+// Limite diário de provas, para o gasto nunca passar do crédito mensal combinado.
+// Contador em memória: reinicia a cada novo "cold start" da função (normal na Vercel),
+// então é uma proteção extra, não uma garantia absoluta — o limite de verdade é a cota
+// configurada no Google Cloud (ver README).
+const LIMITE_PROVAS_DIA = Number(process.env.LIMITE_PROVAS_DIA || 150);
+const LIMITE_PROVAS_IP_DIA = Number(process.env.LIMITE_PROVAS_IP_DIA || 6);
+const contagem = { dia: null, total: 0, porIp: new Map() };
+
+function hojeBrasilia() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // AAAA-MM-DD
+}
+
+function podeGerar(ip) {
+  const hoje = hojeBrasilia();
+  if (contagem.dia !== hoje) { contagem.dia = hoje; contagem.total = 0; contagem.porIp.clear(); }
+  if (contagem.total >= LIMITE_PROVAS_DIA) return false;
+  if ((contagem.porIp.get(ip) || 0) >= LIMITE_PROVAS_IP_DIA) return false;
+  contagem.total++;
+  contagem.porIp.set(ip, (contagem.porIp.get(ip) || 0) + 1);
+  return true;
+}
+
 function json(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -177,6 +199,10 @@ module.exports = async function handler(req, res) {
       }
       if (foto.length * 0.75 > MAX_FOTO_BYTES) {
         return json(res, 413, { erro: "A foto é muito grande. Tente uma imagem menor." });
+      }
+      const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "desconhecido";
+      if (!podeGerar(ip)) {
+        return json(res, 429, { erro: "O provador atingiu o limite de usos de hoje. Volte amanhã ou chame no WhatsApp." });
       }
       const ratio = PROPORCOES.includes(proporcao) ? proporcao : "3:4";
       const out = gemini ? await provarGemini(gemini, foto, arquivo, ratio) : await provarFashn(fashn, foto, arquivo);
