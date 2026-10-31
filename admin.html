@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel | Star Moda Fashion</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="app-page">
+<header class="app-top">
+  <div class="container">
+    <a href="/"><img src="assets/favicon.svg" alt="" width="52" height="52">Ver o site</a>
+    <button class="btn btn--outline-light btn--sm" type="button" id="sair">Sair</button>
+  </div>
+</header>
+
+<main class="app-main" id="conteudo" hidden>
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Painel da loja</p>
+      <h2>Personalizar o site</h2>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" type="button" role="tab" aria-selected="true" data-aba="fotos">Fotos dos vestidos</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-aba="novidades">Novidades</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-aba="clientes">Clientes</button>
+    </div>
+    <p class="msg" id="msg" role="status" hidden></p>
+
+    <!-- Fotos -->
+    <section class="card" data-painel="fotos">
+      <p class="note">Toque em "Trocar" para escolher uma nova foto. Ela aparece no site na hora. Use fotos verticais, de corpo inteiro, sem texto ou preço.</p>
+      <div class="slots" id="slots"></div>
+    </section>
+
+    <!-- Novidades -->
+    <section class="card form" data-painel="novidades" hidden>
+      <form class="form" id="form-produto" novalidate>
+        <h3 id="produto-titulo">Novo vestido</h3>
+        <input type="hidden" name="id">
+        <label>Nome (cor e modelo)<input type="text" name="nome" maxlength="80" placeholder="Ex.: Azul-serenity com fenda" required></label>
+        <label>Texto curto (opcional)<input type="text" name="descricao" maxlength="200"></label>
+        <label>Ordem (menor aparece primeiro)<input type="number" name="ordem" value="0"></label>
+        <label>Foto<input type="file" name="foto" accept="image/jpeg,image/png,image/webp"></label>
+        <label class="check"><input type="checkbox" name="ativo" checked><span>Mostrar no site</span></label>
+        <div class="actions">
+          <button class="btn btn--red" type="submit">Salvar</button>
+          <button class="btn btn--outline" type="button" id="produto-cancelar" hidden>Cancelar edição</button>
+        </div>
+      </form>
+      <div class="tabela-wrap">
+        <table class="tabela">
+          <thead><tr><th>Foto</th><th>Nome</th><th>No site</th><th></th></tr></thead>
+          <tbody id="produtos"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Clientes -->
+    <section class="card" data-painel="clientes" hidden>
+      <div class="tabela-wrap">
+        <table class="tabela">
+          <thead><tr><th>Nome</th><th>E-mail</th><th>WhatsApp</th><th>Desde</th><th></th></tr></thead>
+          <tbody id="clientes"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="js/admin.js" defer></script>
+</body>
+</html>

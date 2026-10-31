@@ -1,0 +1,16 @@
+# Arquivos que NÃO vão para o site publicado
+.git
+.claude
+.wrangler
+.vercel
+node_modules
+Refs
+specs
+*.md
+*.sql
+worker.js
+wrangler.jsonc
+.assetsignore
+.gitignore
+assets/fachada-star-moda.png
+credenciais-demo.txt

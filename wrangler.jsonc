@@ -1,0 +1,17 @@
+{
+  "name": "star-moda-fashion",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": ["/", "/index.html", "/api/*", "/img/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "star-moda-db", "database_id": "359c9714-1851-4945-93d0-2bf41ebc12a0" }
+  ],
+  "kv_namespaces": [
+    { "binding": "IMAGENS", "id": "b420dd51b8d24ab2acbfa41240fba180" }
+  ],
+  "observability": { "enabled": true }
+}

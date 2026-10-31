@@ -9,13 +9,30 @@ const CONFIG = {
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Links de WhatsApp
-document.querySelectorAll("[data-wa]").forEach((el) => {
-  const msg = el.dataset.msg || CONFIG.mensagemPadrao;
-  el.href = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
-  el.target = "_blank";
-  el.rel = "noopener";
-});
+// Links de WhatsApp (com o nome da cliente, se ela estiver conectada)
+const aplicarWhatsApp = (nome) =>
+  document.querySelectorAll("[data-wa]").forEach((el) => {
+    const msg = (el.dataset.msg || CONFIG.mensagemPadrao) + (nome ? ` Meu nome é ${nome}.` : "");
+    el.href = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
+    el.target = "_blank";
+    el.rel = "noopener";
+  });
+aplicarWhatsApp();
+
+// Conta: mostra "Olá, Nome" (ou "Painel" para o admin) no cabeçalho
+const contaLink = document.getElementById("conta-link");
+if (contaLink) {
+  fetch("/api/eu")
+    .then((r) => r.json())
+    .then(({ usuario }) => {
+      if (!usuario) return;
+      const primeiro = usuario.nome.split(" ")[0];
+      contaLink.querySelector("span").textContent = usuario.papel === "admin" ? "Painel" : `Olá, ${primeiro}`;
+      if (usuario.papel === "admin") contaLink.href = "/admin.html";
+      else aplicarWhatsApp(usuario.nome);
+    })
+    .catch(() => {});
+}
 document.querySelectorAll("[data-wa-label]").forEach((el) => (el.textContent = CONFIG.whatsappLabel));
 
 // Aberto agora / fechado agora (seg a sex 9h–18h, sáb 9h–13h, horário de Brasília)
@@ -134,142 +151,6 @@ document.querySelectorAll(".marquee").forEach((m) => {
   m.addEventListener("touchstart", () => m.classList.add("is-paused"), { passive: true });
   m.addEventListener("touchend", () => setTimeout(() => m.classList.remove("is-paused"), 1500));
 });
-
-// ===== Provador virtual =====
-const provador = document.getElementById("provador-form");
-if (provador) {
-  const inputFoto = document.getElementById("foto");
-  const drop = document.getElementById("drop");
-  const preview = document.getElementById("foto-preview");
-  const consent = document.getElementById("consentimento");
-  const botao = document.getElementById("provar");
-  const box = document.getElementById("resultado");
-  const elEmpty = box.querySelector(".result__empty");
-  const elLoading = box.querySelector(".result__loading");
-  const elMsg = box.querySelector(".result__msg");
-  const elImg = box.querySelector(".result__img");
-  const elErro = box.querySelector(".result__error");
-  const acoes = provador.querySelector(".result__actions");
-  const quero = document.getElementById("quero");
-  const baixar = document.getElementById("baixar");
-  let fotoData = null;
-  let fotoProporcao = "3:4";
-  let ativo = true;
-
-  const mostrar = (estado, texto) => {
-    elEmpty.hidden = estado !== "vazio";
-    elLoading.hidden = estado !== "carregando";
-    elImg.hidden = estado !== "pronto";
-    elErro.hidden = estado !== "erro";
-    box.classList.toggle("is-loading", estado === "carregando");
-    if (estado === "erro") elErro.textContent = texto;
-    if (estado === "carregando" && texto) elMsg.textContent = texto;
-    acoes.hidden = estado !== "pronto";
-  };
-
-  // Verifica se o provador está configurado no servidor
-  fetch("/api/provador?saude=1")
-    .then((r) => r.json())
-    .then((d) => { ativo = !!d.ativo; })
-    .catch(() => { ativo = false; })
-    .finally(() => {
-      if (!ativo) {
-        botao.disabled = true;
-        mostrar("erro", "O provador virtual está sendo configurado. Volte em breve!");
-      }
-    });
-
-  // Reduz a foto (máx. 1296 px) para enviar rápido
-  const prepararFoto = (file) =>
-    new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        const max = 1296;
-        const escala = Math.min(1, max / Math.max(img.width, img.height));
-        const c = document.createElement("canvas");
-        c.width = Math.round(img.width * escala);
-        c.height = Math.round(img.height * escala);
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        // proporção mais próxima entre as aceitas pela IA
-        const opcoes = { "9:16": 9 / 16, "2:3": 2 / 3, "3:4": 3 / 4, "4:5": 4 / 5, "1:1": 1, "5:4": 5 / 4, "4:3": 4 / 3, "3:2": 3 / 2, "16:9": 16 / 9 };
-        const r = img.width / img.height;
-        fotoProporcao = Object.keys(opcoes).reduce((a, b) => (Math.abs(opcoes[b] - r) < Math.abs(opcoes[a] - r) ? b : a));
-        resolve(c.toDataURL("image/jpeg", 0.9));
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("imagem")); };
-      img.src = url;
-    });
-
-  const receberArquivo = async (file) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    try {
-      fotoData = await prepararFoto(file);
-      preview.src = fotoData;
-      preview.hidden = false;
-      drop.querySelector(".drop__empty").hidden = true;
-      drop.querySelector(".drop__change").hidden = false;
-      drop.classList.add("has-foto");
-      if (ativo) mostrar("vazio");
-    } catch {
-      mostrar("erro", "Não conseguimos abrir essa imagem. Tente uma foto em JPG ou PNG.");
-    }
-  };
-
-  inputFoto.addEventListener("change", () => receberArquivo(inputFoto.files[0]));
-  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("is-over"); }));
-  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("is-over"); }));
-  drop.addEventListener("drop", (e) => receberArquivo(e.dataTransfer.files[0]));
-
-  const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
-  const frases = ["Analisando a sua foto…", "Vestindo o modelo escolhido…", "Ajustando caimento e luz…", "Quase pronto…"];
-
-  provador.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (!ativo) return;
-    const escolhido = provador.querySelector('input[name="vestido"]:checked');
-    if (!fotoData) return mostrar("erro", "Envie uma foto sua de corpo inteiro (passo 1).");
-    if (!escolhido) return mostrar("erro", "Escolha um vestido (passo 2).");
-    if (!consent.checked) return mostrar("erro", "Marque a autorização de uso da foto para continuar.");
-
-    botao.disabled = true;
-    mostrar("carregando", frases[0]);
-    let f = 0;
-    const girar = setInterval(() => { elMsg.textContent = frases[Math.min(++f, frases.length - 1)]; }, 4000);
-    try {
-      const r = await fetch("/api/provador", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ foto: fotoData, vestido: escolhido.value, proporcao: fotoProporcao }),
-      });
-      const d = await r.json();
-      const pronto = (imagem) => {
-        elImg.src = imagem;
-        baixar.href = imagem;
-        const msg = `Olá! Usei o provador virtual do site e quero o vestido ${escolhido.dataset.nome}.`;
-        quero.href = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
-        mostrar("pronto");
-      };
-      if (r.ok && d.imagem) return pronto(d.imagem); // Gemini responde na hora
-      if (!r.ok || !d.id) throw new Error(d.erro || "Não foi possível começar a prova.");
-
-      const inicio = Date.now();
-      while (Date.now() - inicio < 120000) {
-        await esperar(2500);
-        const s = await fetch(`/api/provador?id=${encodeURIComponent(d.id)}`).then((x) => x.json());
-        if (s.status === "pronto") return pronto(s.imagem);
-        if (s.status === "erro") throw new Error(s.erro);
-      }
-      throw new Error("Demorou mais que o esperado. Tente novamente.");
-    } catch (err) {
-      mostrar("erro", err.message || "Não foi possível gerar a imagem agora. Tente novamente.");
-    } finally {
-      clearInterval(girar);
-      botao.disabled = !ativo;
-    }
-  });
-}
 
 // ===== Fachada animada =====
 const scene = document.getElementById("scene");

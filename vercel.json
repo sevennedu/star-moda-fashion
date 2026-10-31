@@ -1,5 +1,0 @@
-{
-  "functions": {
-    "api/provador.js": { "maxDuration": 60 }
-  }
-}
